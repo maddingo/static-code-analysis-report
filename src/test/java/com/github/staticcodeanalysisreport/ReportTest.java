@@ -5,9 +5,12 @@ import static org.hamcrest.CoreMatchers.*;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.Reader;
 
+import org.apache.log4j.Logger;
 import org.junit.Test;
 
 public class ReportTest {
@@ -42,6 +45,18 @@ public class ReportTest {
         }
     }
     
+    private String toString(File file) throws IOException {
+        StringBuilder sb = new StringBuilder();
+        try (Reader reader = new FileReader(file);) {
+            char[] buf = new char[0xff];
+            int readChunk;
+            while((readChunk = reader.read(buf)) >= 0) {
+                sb.append(buf, 0, readChunk);
+            }
+            return sb.toString();
+        }
+    }
+    
     @Test
     public void createFullReport() throws Exception {
         ScaReportUtility scautil = new ScaReportUtility();
@@ -51,6 +66,9 @@ public class ReportTest {
         scautil.runReport("src/test/resources/findbugs.xml", "src/test/resources/checkstyle.xml", "src/test/resources/pmd.xml", outFile.getAbsolutePath());
         
         assertThat("Output File should exist", outFile.exists(), is(equalTo(true)));
-        assertThat(fileSize(outFile), is(equalTo(9354L)));
+        
+        String content = toString(outFile);
+        
+        assertThat(content, endsWith("</html>"));
     }
 }
