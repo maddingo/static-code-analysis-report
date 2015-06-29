@@ -1,5 +1,6 @@
 # static-code-analysis-report
 How to Transform the Results from Findbugs, Checkstyle and PMD into a single HTML Report with XSLT 2.0 and Java?
+More documentation on [Markus Sprunk's (the author's)  blogg](http://www.sw-engineering-candies.com/blog-1/howtotransformtheresultsfromfindbugscheckstyleandpmdintoasinglehtmlreportwithxslt20andjava).
 
 ## Usage
 1. Clone the repository
