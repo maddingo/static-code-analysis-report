@@ -4,6 +4,7 @@ import static org.junit.Assert.*;
 import static org.hamcrest.CoreMatchers.*;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 
@@ -30,8 +31,14 @@ public class ReportTest {
      * @see http://stackoverflow.com/questions/116574/java-get-file-size-efficiently
      */
     private static long fileSize(File file) throws IOException {
-        try (InputStream stream = file.toURI().toURL().openStream();) {
-            return stream.available();
+        long readTotal = 0L;
+        try (InputStream stream = new FileInputStream(file);) {
+            byte[] buf = new byte[0xff];
+            int readChunk;
+            while((readChunk = stream.read(buf)) >= 0) {
+                readTotal += readChunk;
+            }
+            return readTotal;
         }
     }
     
@@ -44,6 +51,6 @@ public class ReportTest {
         scautil.runReport("src/test/resources/findbugs.xml", "src/test/resources/checkstyle.xml", "src/test/resources/pmd.xml", outFile.getAbsolutePath());
         
         assertThat("Output File should exist", outFile.exists(), is(equalTo(true)));
-        assertThat("Output File should be empty", fileSize(outFile), is(equalTo(9354L)));
+        assertThat(fileSize(outFile), is(equalTo(9354L)));
     }
 }
