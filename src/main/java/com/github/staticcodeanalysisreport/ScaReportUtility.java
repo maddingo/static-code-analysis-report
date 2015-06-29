@@ -44,6 +44,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.PrintStream;
 
 import javax.xml.transform.Transformer;
 import javax.xml.transform.TransformerException;
@@ -53,17 +54,34 @@ import javax.xml.transform.stream.StreamSource;
 
 import org.apache.log4j.Logger;
 
-class ScaReportUtility {
+public class ScaReportUtility {
 
-	private static final String EMPTY = "";
+    private static final String EMPTY = "";
 
 	private static final Logger LOGGER = Logger.getLogger(ScaReportUtility.class);
 
-	private static void run(final String xslt, final String input, final String output, final String param,
+	public static void main(final String[] args) {
+	    ScaReportUtility scautil = new ScaReportUtility();
+	    if (args.length != 4) {
+	        scautil.usage(System.out);
+	        return;
+	    }
+	    try {
+	        String findbugs = args[0];
+	        String checkstyle = args[1];
+	        String pmd = args[2];
+	        String result = args[3];
+	        scautil.runReport(findbugs, checkstyle, pmd, result);
+	    } catch (IOException e) {
+	        LOGGER.error(null, e);
+	    }
+	}
+	
+	private void run(final String xslt, final File input, final File output, final String param,
 			final String value) throws IOException {
 
 	    if (LOGGER.isInfoEnabled()) {
-	        LOGGER.info(input + "  > " + xslt + " " + param + " " + value + " >  " + output);
+	        LOGGER.info(input.getName() + "  > " + xslt + " " + param + " " + value + " >  " + output);
 	    }
 
 		final TransformerFactory transformerFactory = TransformerFactory.newInstance();
@@ -91,62 +109,53 @@ class ScaReportUtility {
 		}
 	}
 
-	static void deletefile(final String pathName) {
-		final File file = new File(pathName);
-		if (!file.delete()) {
-			LOGGER.error("Unable to delete file " + pathName);
-		}
-	}
+	public void usage(PrintStream out) {
+	    out.println("Usage:\n\t java -jar scautil.jar findbugs.xml checkstyle.xml pmd.xml result.html");
+    }
 
-	public static void main(final String[] args) {
-	    try {
-            runReport();
-        } catch (IOException e) {
-            LOGGER.error(null, e);
-        }
-	}
-	
-	private static void runReport() throws IOException {
+	/**
+	 * 
+	 * @param findbugsFilename
+	 * @param checkstyleFilename
+	 * @param pmdFilename
+	 * @param resultFileName
+	 * @throws IOException
+	 */
+    public void runReport(String findbugsFilename, String checkstyleFilename, String pmdFilename, String resultFileName) throws IOException {
 		// Prepare userDirectory and tempDirectoryPrefix
-		final String reportDir = "src/test/resources/";
-		final String outputDir = "target/";
-		final String timeStamp = Integer.toHexString((int) System.nanoTime());
-		final String tempDirectory = System.getProperty("java.io.tmpdir");
-		final String tempDirectoryPrefix = new File(tempDirectory, timeStamp).getAbsolutePath();
+		final String tempFilePrefix = "sca-" + Integer.toHexString((int) System.nanoTime());
 
 		// 1. Create intermediate xml-file for Findbugs
-		final String inputFileFindbugs = reportDir + "findbugs.xml";
-		final String findbugsTempFile = tempDirectoryPrefix + "_PostFB.xml";
-		run("/prepare_findbugs.xslt", inputFileFindbugs, findbugsTempFile, EMPTY, EMPTY);
+		final File inputFileFindbugs = new File(findbugsFilename);
+		final File findbugsTempFile = File.createTempFile(tempFilePrefix, "_PostFB.xml");
+		findbugsTempFile.deleteOnExit();
+	    run("/prepare_findbugs.xslt", inputFileFindbugs, findbugsTempFile, EMPTY, EMPTY);
 
 		// 2. Create intermediate xml-file for Checkstyle
-		final String inputFileCheckstyle = reportDir + "checkstyle.xml";
-		final String checkstyleTempFile = tempDirectoryPrefix + "_PostCS.xml";
+		final File inputFileCheckstyle = new File(checkstyleFilename);
+		final File checkstyleTempFile = File.createTempFile(tempFilePrefix, "_PostCS.xml");
+		checkstyleTempFile.deleteOnExit();
 		run("/prepare_checkstyle.xslt", inputFileCheckstyle, checkstyleTempFile, EMPTY, EMPTY);
 
 		// 3. Create intermediate xml-file for PMD
-		final String inputFilePMD = reportDir + "pmd.xml";
-		final String pmdTempFile = tempDirectoryPrefix + "_PostPM.xml";
+		final File inputFilePMD = new File(pmdFilename);
+		final File pmdTempFile = File.createTempFile(tempFilePrefix, "_PostPM.xml");
+		pmdTempFile.deleteOnExit();
 		run("/prepare_pmd.xslt", inputFilePMD, pmdTempFile, EMPTY, EMPTY);
 
 		// 4. Merge first two files and create firstMergeResult file
-		final String firstMergeResult = tempDirectoryPrefix + "_FirstMerge.xml";
-		run("/merge.xslt", checkstyleTempFile, firstMergeResult, "with", findbugsTempFile);
+		final File firstMergeResult = File.createTempFile(tempFilePrefix, "_FirstMerge.xml");
+		firstMergeResult.deleteOnExit();
+		run("/merge.xslt", checkstyleTempFile, firstMergeResult, "with", findbugsTempFile.getAbsolutePath());
 
 		// 5. Merge result file with third file and create secondMergeResult
 		// file
-		final String secondMergeResult = tempDirectoryPrefix + "_SecondMerge.xml";
-		run("/merge.xslt", firstMergeResult, secondMergeResult, "with", pmdTempFile);
+		final File secondMergeResult = File.createTempFile(tempFilePrefix, "_SecondMerge.xml");
+		secondMergeResult.deleteOnExit();
+		run("/merge.xslt", firstMergeResult, secondMergeResult, "with", pmdTempFile.getAbsolutePath());
 
 		// 6. Create html report out of secondMergeResult
-		final String htmlOutputFileName = outputDir + "result.html";
+		final File htmlOutputFileName = new File(resultFileName);
 		run("/create_html.xslt", secondMergeResult, htmlOutputFileName, EMPTY, EMPTY);
-
-		// Delete all temporary files
-		deletefile(findbugsTempFile);
-		deletefile(checkstyleTempFile);
-		deletefile(pmdTempFile);
-		deletefile(firstMergeResult);
-		deletefile(secondMergeResult);
 	}
 }
